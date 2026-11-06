@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>屏東廠製程日報</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a lab clipboard — sticky summary bar, AI intake panel, then one compact form card per 品項, grouped by 料別 */
+:root{
+  --bg:#f3f5f4; --paper:#ffffff; --ink:#1c2422; --mute:#5d6b67; --line:#d5dcd9;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --accent-soft:#e2efe9;
+  --ok:#1f7a3f; --ok-soft:#e3f3e8; --bad:#b4321f; --bad-soft:#fbe7e3; --warn:#9a6a00; --warn-soft:#fbf1d8;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121816; --paper:#1a2220; --ink:#e3ebe8; --mute:#93a39e; --line:#2e3a37;
+  --accent:#5fbf9f; --accent-ink:#0f1a17; --accent-soft:#1f3530;
+  --ok:#6fd08f; --ok-soft:#1b3324; --bad:#ff8a73; --bad-soft:#3c211c; --warn:#e9b949; --warn-soft:#352b14; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121816; --paper:#1a2220; --ink:#e3ebe8; --mute:#93a39e; --line:#2e3a37;
+  --accent:#5fbf9f; --accent-ink:#0f1a17; --accent-soft:#1f3530;
+  --ok:#6fd08f; --ok-soft:#1b3324; --bad:#ff8a73; --bad-soft:#3c211c; --warn:#e9b949; --warn-soft:#352b14; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+.bar .in{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.brand{display:flex;flex-direction:column;min-width:0}
+.brand b{font-size:16px;text-wrap:balance}
+.brand small{color:var(--mute);font-size:12px}
+.grow{flex:1}
+.idx{display:flex;gap:14px;font-variant-numeric:tabular-nums}
+.idx div{display:flex;flex-direction:column;align-items:flex-end}
+.idx small{color:var(--mute);font-size:11px;letter-spacing:.04em}
+.idx strong{font-family:var(--f-num);font-size:18px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:4px 6px;min-width:0}
+input[type=number],input.num{font-family:var(--f-num);text-align:right;width:100%}
+.datebox{display:flex;gap:6px;align-items:center}
+.status{font-size:12px;color:var(--mute)}
+h2{font-size:15px;margin:28px 0 10px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-weight:400;color:var(--mute);font-size:12px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-top:16px}
+.panel p{margin:4px 0;color:var(--mute);max-width:70ch}
+.ai-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap}
+.thumbs img{height:56px;border-radius:4px;border:1px solid var(--line)}
+.tbl{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left;white-space:nowrap}
+td.n{font-family:var(--f-num);text-align:right}
+.dates{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chipbtn{font-size:12px;padding:2px 8px;border-radius:99px}
+.chipbtn.on{background:var(--accent-soft);border-color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,500px),1fr));gap:12px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card.ns{opacity:.62}
+.card.fail{border-left:4px solid var(--bad)}
+.card.pass{border-left:4px solid var(--ok)}
+.card.extra-on{border-left:4px solid var(--warn)}
+.ch{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ch .no{font-family:var(--f-num);color:var(--mute);font-size:12px}
+.ch .nm{font-weight:700;font-size:15px}
+.ch .cd{font-family:var(--f-num);font-size:12px;color:var(--mute)}
+.pill{font-size:12px;border-radius:99px;padding:1px 9px;font-weight:500}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.mute{background:var(--bg);color:var(--mute)}
+.meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px}
+.meta .chk{white-space:nowrap}
+.meta label,.fld label{display:flex;flex-direction:column;font-size:11px;color:var(--mute);gap:2px;letter-spacing:.03em}
+.meta input{width:100%}
+.chk{flex-direction:row!important;align-items:center;gap:6px!important;font-size:13px!important;color:var(--ink)!important}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.fld{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fld .spec{font-size:11px;color:var(--mute);font-family:var(--f-num)}
+.fld.bad input{border:2px solid var(--bad);background:var(--bad-soft)}
+.fld.ok input{border-color:var(--ok)}
+.fld .calc{font-size:11px;color:var(--accent)}
+details.raw{font-size:12px;border-top:1px dashed var(--line);padding-top:6px}
+details.raw summary{cursor:pointer;color:var(--accent)}
+.rawgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+.rawgrid .formula{grid-column:1/-1;color:var(--mute);font-family:var(--f-num);font-size:11px}
+.cum{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums;font-family:var(--f-num);display:flex;gap:4px 14px;flex-wrap:wrap}
+.cum b{font-family:var(--f-body);font-weight:500}
+.nsrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.foot{margin-top:24px;font-size:12px;color:var(--mute);display:flex;flex-direction:column;gap:2px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:13px;z-index:20}
+.phtop{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-top:10px}
+.phtop .phf{flex-direction:row;align-items:center;gap:6px}
+.phtop .phf input{width:90px}
+.phformula{margin-top:8px;font-family:var(--f-num);font-size:12px;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:6px 10px}
+.phlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:10px;margin-top:10px}
+.phrow{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.phrow.ns{opacity:.6}
+.phgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.phf{display:flex;flex-direction:column;gap:2px;min-width:0}
+.phf>span:first-child,.phf>label{font-size:11px;color:var(--mute);letter-spacing:.03em}
+.res{font-size:12px;font-family:var(--f-num);display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;min-height:20px}
+.res .spec{color:var(--mute)}
+.okt{color:var(--ok)}.badt{color:var(--bad)}
+.numt{font-family:var(--f-num);color:var(--ink)}
+@media (max-width:560px){.meta{grid-template-columns:repeat(2,minmax(0,1fr))}.idx strong{font-size:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="bar"><div class="in">
+  <div class="brand"><b>屏東飼料廠 製程與成品品質化驗日報</b><small>Q-10 Rev.4 線上版 · <span id="store">連線中…</span></small></div>
+  <div class="datebox"><label for="date" class="status">日期</label><input type="date" id="date"></div>
+  <div class="grow"></div>
+  <div class="idx">
+    <div><small>本日品質指數</small><strong id="idxDay">–</strong><small id="idxDayN"></small></div>
+    <div><small>本月累計</small><strong id="idxMon">–</strong><small id="idxMonN"></small></div>
+  </div>
+  <div class="btns"><button class="primary" id="save">儲存本日</button><button id="export">匯出 Excel</button></div>
+</div></div>
+
+<div class="wrap">
+  <div class="panel" id="xlsPanel">
+    <b>上傳 NIR Excel 檔</b>
+    <p>選 NIR 匯出的 Excel（第一列為「樣品編號、M、CP、fat、品管編號、項目、粗細度…」）。系統會依樣品名稱對到日報品項，對不到的可以自己選，確認後按套用。物性欄依品項類型對應：粉料為 &gt;6目 / 6~10目 / &lt;35目，粒料為含粉率 / 堅牢度，碎粒為上層 / 下層篩。</p>
+    <div class="ai-row">
+      <input type="file" id="xlsFile" accept=".xlsx,.xls,.csv">
+      <span class="status" id="xlsMsg"></span>
+    </div>
+    <div id="xlsResult"></div>
+  </div>
+
+  <div class="panel" id="aiPanel">
+    <b>AI 辨識 NIR 照片</b>
+    <p>上傳 NIR 分析儀的結果畫面照片、列印單或截圖，AI 會讀出各樣品的水分、粗蛋白、脂肪等數值，比對產品代號後填入下方欄位。填入前會先列出讓你確認。</p>
+    <div class="ai-row">
+      <input type="file" id="aiFile" accept="image/*" multiple>
+      <button class="primary" id="aiGo" disabled>開始辨識</button>
+            <span class="status" id="aiMsg"></span>
+    </div>
+    <div class="thumbs" id="aiThumbs"></div>
+    <div id="aiResult"></div>
+  </div>
+
+  <div class="panel" id="phys">
+    <b>物性試驗計算</b>
+    <p>每個樣品填入樣品總重、袋重和各篩層秤出的重量，自動算出粗細度與含粉率；堅牢度和比重直接填測定結果。依日報標準判定後同步填進下方日報欄位。</p>
+    <div class="phtop">
+      <div class="dates" id="phTabs" style="margin-top:0"></div>
+      <label class="chk"><input type="checkbox" id="phTare"> 秤量重量也含袋重（自動扣除）</label>
+      <label class="chk"><input type="checkbox" id="phAll"> 顯示 NO SAMPLE 品項</label>
+    </div>
+    <div class="phformula" id="phFormula"></div>
+    <div class="phlist" id="phList"></div>
+  </div>
+
+  <div class="panel">
+    <b>已儲存的日報</b>
+    <div class="dates" id="dates"><span class="status">讀取中…</span></div>
+  </div>
+
+  <div id="groups"></div>
+
+  <h2>其他 <small>不在固定 23 項的品項，例如外加或研發試製；從標準表挑選代號</small></h2>
+  <div class="grid" id="extras"></div>
+  <div style="margin-top:10px"><select id="addCode"></select> <button id="addExtra">加入品項</button></div>
+
+  <div class="foot">
+    <span>註1：檢驗數據四捨五入後判定是否符合標準（M、CP、F 取 1 位，Ca 與物性取 2 位）。</span>
+    <span>註2：超限數據以紅框表示（原表以 □ 線表示）。</span>
+    <span>註3：勾選「外加」的品項不列入品質指數計算。</span>
+    <span>成分標準取自 R-20 飼料成份製程管制標準表（研發部 115/10/22 版）。</span>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const STD = {"11023":{"name":"高前 (碎粒)","CP":[21.5,23],"F":[5.17,6.37],"Fi":3.11,"P":[0.522,0.667],"Ca":[0.819,1.046],"M":[10.45,12.45]},"11032":{"name":"肉前 (粒)","CP":[20.7,22.7],"F":[7.78,8.98],"Fi":2.94,"P":[0.504,0.644],"Ca":[0.75,0.92],"M":[10.26,12.26]},"11033":{"name":"肉前 (碎粒)","CP":[20.7,22.7],"F":[7.31,8.51],"Fi":2.87,"P":[0.495,0.632],"Ca":[0.75,0.92],"M":[10.19,12.19]},"11042":{"name":"肉后 (粒)","CP":[18.7,20.7],"F":[8.6,9.8],"Fi":2.76,"P":[0.45,0.564],"Ca":[0.75,0.805],"M":[10.24,12.24]},"11052":{"name":"超肉后 (粒)","CP":[17.7,19.7],"F":[8.04,9.24],"Fi":2.66,"P":[0.45,0.529],"Ca":[0.75,0.805],"M":[10.28,12.28]},"11062":{"name":"土肉前 (粒)","CP":[18,19.7],"F":[6.48,7.68],"Fi":2.81,"P":[0.513,0.655],"Ca":[0.75,0.862],"M":[10.21,12.21]},"11063":{"name":"土肉前 (碎粒)","CP":[18,19.7],"F":[6.48,7.68],"Fi":2.81,"P":[0.513,0.655],"Ca":[0.75,0.862],"M":[10.21,12.21]},"11072":{"name":"土肉后 (粒)","CP":[17.23,19.23],"F":[7.23,8.43],"Fi":2.68,"P":[0.477,0.609],"Ca":[0.75,0.793],"M":[10.08,12.08]},"11082":{"name":"土超肉后 (粒)","CP":[17.2,19.2],"F":[7.14,8.34],"Fi":2.68,"P":[0.45,0.506],"Ca":[0.75,0.69],"M":[10.17,12.17]},"11092":{"name":"土雞38(粒)","CP":[17.7,19.7],"F":[7.42,8.62],"Fi":2.81,"P":[0.459,0.586],"Ca":[0.75,0.784],"M":[10.03,12.03]},"11162":{"name":"黃土肉后 (粒)","CP":[17.7,19.7],"F":[7.78,8.98],"Fi":2.82,"P":[0.459,0.586],"Ca":[0.75,0.784],"M":[9.98,11.98]},"11172":{"name":"強化肉雞(粒)","CP":[19.7,21.7],"F":[6.47,7.67],"Fi":2.72,"P":[0.504,0.644],"Ca":[0.765,0.977],"M":[10.29,12.29]},"11173":{"name":"強化肉雞(碎粒)","CP":[19.78,21.78],"F":[7.04,8.24],"Fi":2.82,"P":[0.504,0.644],"Ca":[0.765,0.977],"M":[10.33,12.33]},"11182":{"name":"黃土超肉後(粒)","CP":[18.2,20.2],"F":[8.12,9.32],"Fi":2.83,"P":[0.45,0.575],"Ca":[0.75,0.75],"M":[9.91,11.91]},"11213":{"name":"鹿野一期","CP":[20.2,22.2],"F":[3.69,4.89],"Fi":3.2,"P":[0.576,0.736],"Ca":[0.9,1.15],"M":[10.36,12.36]},"11223":{"name":"鹿野二期 (碎粒)","CP":[19.7,21.7],"F":[5.16,6.36],"Fi":3.02,"P":[0.486,0.621],"Ca":[0.75,0.845],"M":[10.24,12.24]},"11232":{"name":"鹿野三期","CP":[18.2,20.2],"F":[5.3,6.5],"Fi":2.82,"P":[0.45,0.54],"Ca":[0.75,0.728],"M":[10.31,12.31]},"11242":{"name":"鹿野四期","CP":[17.7,19.7],"F":[5.49,6.69],"Fi":2.8,"P":[0.45,0.517],"Ca":[0.75,0.693],"M":[10.31,12.31]},"11252":{"name":"超肉 后  A (粒)","CP":[19.2,21],"F":[8.67,9.87],"Fi":2.74,"P":[0.45,0.575],"Ca":[0.75,0.805],"M":[10.08,12.08]},"11262":{"name":"肉 后  A (粒)","CP":[19.54,21],"F":[8.73,9.93],"Fi":2.82,"P":[0.45,0.564],"Ca":[0.75,0.805],"M":[10.2,12.2]},"11292":{"name":"山雞二期","CP":[19.7,21.7],"F":[6.93,8.13],"Fi":2.93,"P":[0.558,0.713],"Ca":[0.855,1.092],"M":[9.92,11.92]},"11302":{"name":"山雞三期","CP":[17.2,19.2],"F":[7.42,8.62],"Fi":2.76,"P":[0.477,0.609],"Ca":[0.75,0.793],"M":[10.02,12.02]},"11413":{"name":"紅仿一期(碎粒)","CP":[21.2,23],"F":[5.12,6.32],"Fi":3.16,"P":[0.531,0.678],"Ca":[0.75,0.949],"M":[10.19,12.19]},"11423":{"name":"紅仿二期(碎粒)","CP":[18.7,20.7],"F":[6.25,7.45],"Fi":2.79,"P":[0.513,0.655],"Ca":[0.75,0.862],"M":[10.1,12.1]},"11432":{"name":"紅仿三期(粒)","CP":[17.2,19.2],"F":[8.2,9.4],"Fi":2.83,"P":[0.477,0.609],"Ca":[0.75,0.793],"M":[10,12]},"11442":{"name":"紅仿四期(粒)","CP":[17.7,19.7],"F":[8.11,9.31],"Fi":2.83,"P":[0.45,0.506],"Ca":[0.75,0.693],"M":[10.04,12.04]},"11532":{"name":"燉雞三期(粒)","CP":[17.2,19.2],"F":[7.66,8.86],"Fi":2.79,"P":[0.486,0.621],"Ca":[0.75,0.793],"M":[10.03,12.03]},"11542":{"name":"燉雞四期(粒)","CP":[17.2,19.2],"F":[7.65,8.85],"Fi":2.69,"P":[0.486,0.621],"Ca":[0.75,0.793],"M":[9.99,11.99]},"11572":{"name":"土超肉后 A (粒)","CP":[17.7,19.7],"F":[8.17,9.37],"Fi":2.78,"P":[0.45,0.575],"Ca":[0.75,0.943],"M":[9.93,11.93]},"11582":{"name":"鹿野五期","CP":[17.7,19.7],"F":[5.48,6.68],"Fi":2.79,"P":[0.45,0.517],"Ca":[0.75,0.693],"M":[10.31,12.31]},"11592":{"name":"黃土超肉後A(粒)","CP":[17.7,19.7],"F":[8.45,9.65],"Fi":2.81,"P":[0.477,0.609],"Ca":[0.75,0.793],"M":[9.91,11.91]},"11662":{"name":"鹿野三期W(粒)","CP":[18.2,20.2],"F":[5.86,7.06],"Fi":2.84,"P":[0.45,0.538],"Ca":[0.75,0.728],"M":[10.53,12.53]},"12021":{"name":"蛋中雞 (粉)","CP":[17.7,19.7],"F":[3.34,4.54],"Fi":3.19,"P":[0.567,0.724],"Ca":[0.9,1.1],"M":[11.03,13]},"12023":{"name":"蛋中雞 (碎粒)","CP":[17.7,19.7],"F":[3.24,4.44],"Fi":3.57,"P":[0.558,0.713],"Ca":[0.9,1.1],"M":[11.9,13]},"12031":{"name":"蛋大雞 (粉)","CP":[15.7,17.7],"F":[3.01,4.21],"Fi":3.05,"P":[0.531,0.678],"Ca":[0.9,1.1],"M":[10.54,12.54]},"12091":{"name":"產蛋高峰前期","CP":[18.2,19],"F":[5.84,7.04],"Fi":3.14,"P":[0.576,0.736],"Ca":[3.6,4.6],"M":[9.65,11.65]},"12201":{"name":"蛋Ｎ92 (粉)","CP":[17.4,19],"F":[5.18,6.38],"Fi":2.97,"P":[0.468,0.598],"Ca":[3.735,4.772],"M":[9.8,11.8]},"12291":{"name":"蛋19SP A (粉)","CP":[17.2,19],"F":[5.13,6.33],"Fi":2.97,"P":[0.468,0.598],"Ca":[3.735,4.772],"M":[9.61,11.61]},"12591":{"name":"蛋50SP A","CP":[17.2,19],"F":[5.06,6.26],"Fi":3.11,"P":[0.468,0.598],"Ca":[3.78,4.8],"M":[9.76,11.76]},"12691":{"name":"蛋雞 A (粉)","CP":[16.2,18.2],"F":[3.5,4.7],"Fi":3.13,"P":[0.441,0.564],"Ca":[3.735,4.772],"M":[10.04,12.04]},"12723":{"name":"特配蛋小雞","CP":[19.7,21.7],"F":[4.1,5.3],"Fi":3.24,"P":[0.621,0.793],"Ca":[0.9,1.15],"M":[10.32,12.32]},"12733":{"name":"特配蛋中雞","CP":[17.7,19.7],"F":[3.14,4.34],"Fi":3.24,"P":[0.576,0.736],"Ca":[0.9,1.1],"M":[10.65,12.65]},"13041":{"name":"種19 (粉)","CP":[16.7,18.7],"F":[4.95,6.15],"Fi":2.96,"P":[0.504,0.644],"Ca":[3.6,4.6],"M":[9.85,11.85]},"14122":{"name":"振聲種中鴨","CP":[16.7,18.7],"F":[3.9,5.1],"Fi":3.78,"P":[0.54,0.69],"Ca":[0.81,1],"M":[10.74,12.74]},"14132":{"name":"振聲種大鴨","CP":[13.7,15.7],"F":[3.4,4.6],"Fi":4.08,"P":[0.603,0.77],"Ca":[0.792,1],"M":[10.84,12.84]},"14142":{"name":"振聲種鴨","CP":[19.2,21.2],"F":[4.18,5.38],"Fi":3.96,"P":[0.486,0.621],"Ca":[2.88,3.68],"M":[10.12,12.12]},"14162":{"name":"振聲中鴨(粒)","CP":[16.7,18.7],"F":[5.22,6.42],"Fi":3.69,"P":[0.5,0.621],"Ca":[0.738,0.943],"M":[10.72,12.72]},"14172":{"name":"振聲中鴨加肥(粒)","CP":[16.2,18.2],"F":[5.9,7.1],"Fi":2.92,"P":[0.5,0.589],"Ca":[0.63,0.805],"M":[10.45,12.45]},"14232":{"name":"格全大鴨","CP":[15.2,17.2],"F":[4.26,5.46],"Fi":3.23,"P":[0.567,0.724],"Ca":[0.72,0.92],"M":[10.57,12.57]},"14262":{"name":"1426小鴨","CP":[18.22,20.22],"F":[4.29,5.49],"Fi":3.5,"P":[0.567,0.724],"Ca":[0.756,0.966],"M":[10.51,12.51]},"14272":{"name":"1427中鴨","CP":[15.98,17.98],"F":[5.57,6.77],"Fi":3.45,"P":[0.513,0.655],"Ca":[0.72,0.92],"M":[10.77,12.77]},"14282":{"name":"1428中鴨加肥 (粒)","CP":[16.72,18.72],"F":[4.76,5.96],"Fi":3.1,"P":[0.5,0.575],"Ca":[0.612,0.782],"M":[10.57,12.57]},"14292":{"name":"1429高肉鴨","CP":[15.72,17.72],"F":[4.88,6.08],"Fi":3,"P":[0.5,0.517],"Ca":[0.558,0.713],"M":[10.54,12.54]},"14332":{"name":"金蛋鴨 (粒)","CP":[20.38,22.38],"F":[4.91,6.11],"Fi":3.8,"P":[0.513,0.655],"Ca":[3.24,4.14],"M":[9.23,11.23]},"14352":{"name":"1435蛋鴨 (粒)","CP":[19.7,21.7],"F":[4.85,6.05],"Fi":4,"P":[0.45,0.506],"Ca":[3.24,4.14],"M":[9.42,11.42]},"14422":{"name":"大成肉中鴨","CP":[16.2,18.2],"F":[5.37,6.57],"Fi":3.59,"P":[0.504,0.644],"Ca":[0.738,0.943],"M":[11.22,13]},"14432":{"name":"大成肉大鴨","CP":[16.05,18.05],"F":[6.16,7.36],"Fi":3.56,"P":[0.5,0.584],"Ca":[0.678,0.866],"M":[10.73,12.73]},"10031":{"name":"哺乳(821)(粉)","CP":[17.5,19],"F":[8.29,9.49],"Fi":3.04,"P":[0.5,0.552],"Ca":[0.558,0.713],"M":[10.43,12.43]},"10032":{"name":"哺乳(821)(粒)","CP":[17.72,19],"F":[8.4,9.6],"Fi":3.19,"P":[0.5,0.54],"Ca":[0.558,0.713],"M":[10.46,12.46]},"10033":{"name":"哺乳(821)(碎粒)","CP":[17.5,19],"F":[8.29,9.49],"Fi":3.04,"P":[0.5,0.552],"Ca":[0.558,0.713],"M":[10.43,12.43]},"10182":{"name":"人工乳(811)(粒)","CP":[19.2,21],"F":[7.67,8.87],"Fi":2.66,"P":[0.539,0.689],"Ca":[0.72,0.92],"M":[8.23,10.23]},"10231":{"name":"關山仔豬(粉)","CP":[15.7,17.7],"F":[5.46,6.66],"Fi":3.01,"P":[0.486,0.621],"Ca":[0.585,0.747],"M":[10.45,12.45]},"10232":{"name":"關山仔豬(粒)","CP":[15.7,17.7],"F":[5.03,6.23],"Fi":2.72,"P":[0.477,0.609],"Ca":[0.585,0.747],"M":[10.24,12.24]},"10631":{"name":"高仔豬(839)(粉)","CP":[15.7,17.7],"F":[5.65,6.85],"Fi":2.17,"P":[0.4,0.471],"Ca":[0.468,0.598],"M":[10.63,12.63]},"10632":{"name":"高仔豬(839)(粒)","CP":[15.7,17.7],"F":[4.74,5.94],"Fi":2.29,"P":[0.4,0.46],"Ca":[0.504,0.644],"M":[10.71,12.71]},"10811":{"name":"母后(861)(粉)","CP":[15.7,17.7],"F":[6.24,7.44],"Fi":2.29,"P":[0.4,0.46],"Ca":[0.504,0.644],"M":[10.71,12.71]},"10812":{"name":"母后(861)(粒)","CP":[15.7,17.7],"F":[6.44,7.64],"Fi":3.01,"P":[0.511,0.653],"Ca":[0.756,0.966],"M":[10.62,12.62]},"10822":{"name":"公豬 (粒)","CP":[16.2,17],"F":[2.72,3.92],"Fi":2.99,"P":[0.612,0.782],"Ca":[0.81,1.035],"M":[10.5,12.5]},"10892":{"name":"母前一號(粒)","CP":[12.2,14],"F":[3.34,4.54],"Fi":4.33,"P":[0.477,0.609],"Ca":[0.648,0.828],"M":[10.53,12.53]},"10901":{"name":"母后一號(粉)","CP":[15.2,17.2],"F":[6.83,8.03],"Fi":2.08,"P":[0.513,0.655],"Ca":[0.756,0.966],"M":[10.74,12.74]},"100B1":{"name":"仔豬835(粉)","CP":[15.7,17.7],"F":[6.02,7.22],"Fi":2.07,"P":[0.4,0.483],"Ca":[0.513,0.655],"M":[10.58,12.58]},"100V1":{"name":"特惠仔豬(粉)","CP":[15.7,17.7],"F":[5.02,6.22],"Fi":3.16,"P":[0.495,0.632],"Ca":[0.612,0.782],"M":[11.34,13]},"101B2":{"name":"高仔豬(837)(粒)","CP":[15.2,17.2],"F":[6.25,7.45],"Fi":2.64,"P":[0.4,0.483],"Ca":[0.513,0.655],"M":[10.14,12.14]},"101E2":{"name":"高仔豬(837SP)(粒)","CP":[15.1,17.1],"F":[8.71,9.91],"Fi":2.68,"P":[0.4,0.471],"Ca":[0.468,0.598],"M":[9.84,11.84]},"101F2":{"name":"高仔豬空白(837SPA)(粒)","CP":[14.2,16.2],"F":[5.58,6.78],"Fi":2.6,"P":[0.4,0.448],"Ca":[0.468,0.598],"M":[10.3,12.3]},"101L2":{"name":"超值仔豬空白(832A)(粒)","CP":[15.2,17.2],"F":[4.38,5.58],"Fi":2.46,"P":[0.4,0.437],"Ca":[0.468,0.598],"M":[10.45,12.45]},"101M2":{"name":"超值仔豬1號(832)(粒)","CP":[15.7,17.7],"F":[4.98,6.18],"Fi":2.69,"P":[0.4,0.471],"Ca":[0.513,0.655],"M":[10.32,12.32]},"101S2":{"name":"契約環保生長(粒)","CP":[15.7,17.7],"F":[6.41,7.61],"Fi":3.2,"P":[0.396,0.506],"Ca":[0.513,0.655],"M":[10.8,12.8]},"102P1":{"name":"8305F仔豬(粉)","CP":[15.7,17.7],"F":[6.09,7.29],"Fi":2.35,"P":[0.4,0.494],"Ca":[0.513,0.655],"M":[10.13,12.13]},"106B2":{"name":"高仔豬(836)(粒)","CP":[15.7,17.7],"F":[4.9,6.1],"Fi":3.11,"P":[0.4,0.494],"Ca":[0.63,0.805],"M":[10.46,12.46]},"106H1":{"name":"乾坤中豬(空白) (粉)","CP":[14.7,16],"F":[3.08,4.28],"Fi":3.61,"P":[0.478,0.611],"Ca":[0.54,0.69],"M":[11.39,13]},"106H3":{"name":"乾坤中豬(空白) (碎粒)","CP":[14.7,16],"F":[2.9,4.1],"Fi":3.59,"P":[0.477,0.609],"Ca":[0.54,0.69],"M":[11,13]},"107H2":{"name":"契約哺乳(粒)","CP":[17.2,19],"F":[8.32,9.52],"Fi":3.52,"P":[0.558,0.713],"Ca":[0.657,0.839],"M":[9.88,11.88]},"107I2":{"name":"契約仔豬(粒)","CP":[15.7,17.7],"F":[7.16,8.36],"Fi":2.72,"P":[0.417,0.533],"Ca":[0.54,0.69],"M":[9.97,11.97]},"107N2":{"name":"契約哺乳N21(粒)","CP":[16.2,18.2],"F":[7.91,9.11],"Fi":3.6,"P":[0.5,0.564],"Ca":[0.558,0.713],"M":[9.94,11.94]},"107X3":{"name":"張文山哺仔豬空白(碎)","CP":[17.2,19],"F":[7.93,9.13],"Fi":2.77,"P":[0.5,0.632],"Ca":[0.585,0.747],"M":[10.13,12.13]},"109M2":{"name":"浩然檢定(粒)","CP":[16.7,18],"F":[3.37,4.57],"Fi":3.22,"P":[0.666,0.8],"Ca":[0.918,1.15],"M":[10.44,12.44]},"109P2":{"name":"浩然母前(粒)","CP":[13.7,14],"F":[6.25,7.45],"Fi":5.07,"P":[0.497,0.635],"Ca":[0.648,0.828],"M":[10.08,12.08]},"109Q2":{"name":"浩然母後(粒)","CP":[15.7,17.7],"F":[8.75,9.95],"Fi":3.15,"P":[0.549,0.701],"Ca":[0.756,0.966],"M":[10.86,12.86]},"8599":{"name":"母前料","CP":[11.25,13.25],"F":[3.15,4.35],"Fi":5.81,"P":[0.59,0.754],"Ca":[0.96,1.2],"M":[10.84,12.84]},"8699":{"name":"8699母後料","CP":[17.25,18],"F":[6.71,7.91],"Fi":3.63,"P":[0.567,0.724],"Ca":[0.775,0.991],"M":[9.89,11.89]},"822U":{"name":"822U哺乳料","CP":[17.18,19],"F":[7.93,9.13],"Fi":2.08,"P":[0.513,0.655],"Ca":[0.624,0.797],"M":[10.52,12.52]},"829F":{"name":"康保哺乳料F","CP":[17.26,19],"F":[7.96,9.16],"Fi":2.1,"P":[0.513,0.655],"Ca":[0.624,0.798],"M":[9.71,11.71]},"829G":{"name":"康保哺乳空白料","CP":[18.94,19],"F":[7.39,8.59],"Fi":2.29,"P":[0.576,0.736],"Ca":[0.763,0.975],"M":[9.56,11.56]},"829P":{"name":"哺乳料","CP":[17.14,19],"F":[7.39,8.59],"Fi":2.5,"P":[0.519,0.663],"Ca":[0.625,0.798],"M":[10.38,12.38]},"839B":{"name":"839A空白料","CP":[15.64,17.64],"F":[6.08,7.28],"Fi":2.66,"P":[0.468,0.598],"Ca":[0.626,0.799],"M":[10.22,12.22]},"888A":{"name":"888A母後料","CP":[15.95,17.95],"F":[7.06,8.26],"Fi":2.72,"P":[0.702,0.897],"Ca":[0.996,1.2],"M":[10.36,12.36]},"888B":{"name":"888B南區母前料","CP":[13.17,14],"F":[2.55,3.75],"Fi":3.72,"P":[0.612,0.782],"Ca":[0.87,1.112],"M":[10.5,12.5]}}
+;
+// ---------- form definition (from Q-10 sheet) ----------
+const EGG=(s35)=>[{k:'s6',l:'>6目',u:'%',r:{t:'max',v:3},sieve:1},{k:'s610',l:'6~10目',u:'%',r:{t:'range',lo:24,hi:36},sieve:1},{k:'s35',l:'<35目',u:'%',r:{t:'max',v:s35},sieve:1}];
+const PEL=(f,p)=>[{k:'fines',l:'含粉率',u:'%',r:{t:'max',v:f}},{k:'pdi',l:'堅牢度',u:'%',r:{t:'min',v:p}}];
+const CRB=(a,ra,b,rb)=>[{k:'sA',l:a,u:'%',r:{t:'max',v:ra},sieve:1},{k:'sB',l:b,u:'%',r:{t:'max',v:rb},sieve:1}];
+const SLOTS=[
+ {no:1,cat:'蛋雞',name:'產蛋高峰前期',code:'12091',ca:1,phys:EGG(12)},
+ {no:2,cat:'蛋雞',name:'蛋50SPA',code:'12591',phys:EGG(12)},
+ {no:3,cat:'蛋雞',name:'蛋雞A',code:'12691',phys:EGG(12)},
+ {no:4,cat:'蛋種雞',name:'種19',code:'13041',phys:[...EGG(15),{k:'bd',l:'容重比',u:'g/ml',r:{t:'range',lo:0.59,hi:0.71}}]},
+ {no:5,cat:'肉雞',name:'肉后A',code:'11262',phys:PEL(8,96)},
+ {no:6,cat:'肉雞',name:'鹿野土雞四期',code:'11242',phys:PEL(8,96)},
+ {no:7,cat:'肉雞',name:'超肉后A',code:'11252',phys:PEL(8,96)},
+ {no:8,cat:'肉雞',name:'紅仿三期',code:'11432',phys:PEL(8,96)},
+ {no:9,cat:'肉雞',name:'高前碎粒',code:'11023',phys:CRB('>8目',20,'<20目',20)},
+ {no:10,cat:'肉雞',name:'肉前碎',code:'11033',phys:CRB('>6目',20,'<20目',15)},
+ {no:11,cat:'肉雞',name:'強化肉雞碎',code:'11173',phys:CRB('>6目',20,'<20目',15)},
+ {no:12,cat:'豬',name:'契約仔豬',code:'107I2',phys:PEL(8,95)},
+ {no:13,cat:'豬',name:'環保生長',code:'101S2',phys:PEL(8,95)},
+ {no:14,cat:'豬',name:'浩然母前',code:'109P2',phys:PEL(8,95),fOverride:[5.1,6.3]},
+ {no:15,cat:'豬',name:'契約哺乳N21',code:'107N2',phys:PEL(8,90)},
+ {no:16,cat:'豬',name:'契約哺乳',code:'107H2',phys:PEL(8,90)},
+ {no:17,cat:'豬',name:'人工乳(811)',code:'10182',phys:PEL(8,95)},
+ {no:18,cat:'鴨',name:'振聲中鴨加肥',code:'14172',phys:PEL(2,98)},
+ {no:19,cat:'鴨',name:'1435蛋鴨',code:'14352',phys:PEL(2,98)},
+ {no:20,cat:'鴨',name:'大成肉中鴨',code:'14422',phys:PEL(2,98),note:'每週一樣品'},
+ {no:21,cat:'鴨',name:'振聲種鴨',code:'14142',ca:1,fi:1,phys:[],note:'Ca 每週一樣品，Fi 每月一樣品'},
+ {no:22,cat:'鴨',name:'振聲種中鴨',code:'14122',ca:1,fi:1,phys:[],note:'每月一樣品'},
+ {no:23,cat:'鴨',name:'振聲種大鴨',code:'14132',ca:1,fi:1,phys:[],note:'每月一樣品'},
+];
+const EXTRA_PHYS=PEL(8,96);
+const CHEM=[{k:'M',l:'M% 水分',d:1},{k:'CP',l:'CP% 粗蛋白',d:1},{k:'F',l:'F% 脂肪',d:1},{k:'Ca',l:'Ca% 鈣',d:2},{k:'Fi',l:'Fi% 纖維',d:2}];
+const RAW={
+  fines:{f:[['w0','樣品重 g'],['wf','篩下細粉重 g']],calc:r=>r.wf/r.w0*100,txt:'含粉率 = 細粉重 ÷ 樣品重 × 100'},
+  pdi:{f:[['w1','翻滾前樣品重 g'],['w2','翻滾後篩上顆粒重 g']],calc:r=>r.w2/r.w1*100,txt:'堅牢度 = 翻滾後篩上重 ÷ 翻滾前重 × 100'},
+  bd:{f:[['g','樣品重 g'],['ml','容量 ml']],calc:r=>r.g/r.ml,txt:'容重比 = 重量 ÷ 容積'},
+};
+const NS_REASONS=['當日無生產','未送樣品','未說明原因','其他'];
+
+// ---------- helpers ----------
+const HAS_GAS=!!(window.google&&google.script&&google.script.run);
+// 在 GitHub Pages 等外部網站時，透過 Apps Script 網址存取試算表
+const API_URL='https://script.google.com/macros/s/AKfycbxioIpmEueosa3NqCq015aaZKePVJVxnxzTrgMBRY1B-QSLflTbUamBGQYFVxcu5JT92Q/exec';
+const BACKEND=HAS_GAS||!!API_URL;
+const gs=(fn,...args)=>HAS_GAS
+  ?new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args))
+  :fetch(API_URL,{method:'POST',body:JSON.stringify({fn,args})}).then(r=>r.json()).then(j=>{if(!j.ok)throw new Error(j.error||'伺服器錯誤');return j.data});
+const $=s=>document.querySelector(s);
+const r_=(v,d)=>{const p=10**d;return Math.round((v+Math.sign(v)*1e-9)*p)/p};
+const num=v=>(v===''||v==null||isNaN(+v))?null:+v;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function chemStd(code,k,slot){
+  const s=STD[code]; if(!s) return null;
+  if(k==='F'&&slot&&slot.fOverride) return {t:'range',lo:slot.fOverride[0],hi:slot.fOverride[1]};
+  if(k==='Fi') return {t:'max',v:6};
+  const a=s[k]; if(!a||a[0]==null) return null;
+  return {t:'range',lo:a[0],hi:a[1]};
+}
+function judge(v,rule,d){
+  if(v==null||!rule) return null;
+  const x=r_(v,d);
+  if(rule.t==='max') return x<=r_(rule.v,d);
+  if(rule.t==='min') return x>=r_(rule.v,d);
+  return x>=r_(rule.lo,d)&&x<=r_(rule.hi,d);
+}
+function ruleTxt(rule,d){
+  if(!rule) return '無標準';
+  if(rule.t==='max') return '≤ '+rule.v;
+  if(rule.t==='min') return '≥ '+rule.v;
+  return r_(rule.lo,d).toFixed(d)+' ~ '+r_(rule.hi,d).toFixed(d);
+}
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600)}
+function todayStr(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
+function rocDate(iso){const [y,m,d]=iso.split('-');return `${+y-1911}年${m}月${d}日`}
+function mean(a){return a.reduce((s,x)=>s+x,0)/a.length}
+function sd(a){if(a.length<2)return null;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1))}
+
+// ---------- state ----------
+let db=null, days={}, cur=null, curDate=todayStr(), dirty=false, jumped=false;
+function blankDay(date){return {date,entries:{},extras:[],updated:null}}
+function entry(key){return cur.entries[key]||(cur.entries[key]={})}
+function slotFor(key){
+  if(key.startsWith('x')){const e=cur.extras.find(x=>x.id===key);return {no:'+',cat:'其他',name:STD[e.code]?.name||e.code,code:e.code,phys:EXTRA_PHYS,ca:0,fi:0,extraSlot:1}}
+  return SLOTS.find(s=>'n'+s.no===key);
+}
+function chemKeys(slot){return CHEM.filter(c=>['M','CP','F'].includes(c.k)||(c.k==='Ca'&&slot.ca)||(c.k==='Fi'&&slot.fi))}
+function evalEntry(slot,e){
+  if(!e||e.ns) return {state:'ns'};
+  let any=false,fail=false;
+  for(const c of chemKeys(slot)){const v=num(e[c.k]);if(v==null)continue;any=true;if(judge(v,chemStd(slot.code,c.k,slot),c.d)===false)fail=true}
+  for(const p of slot.phys){const v=num(e.p?.[p.k]);if(v==null)continue;any=true;if(judge(v,p.r,2)===false)fail=true}
+  if(!any) return {state:'empty'};
+  return {state:fail?'fail':'pass'};
+}
+function dayIndex(day){
+  let n=0,ok=0;
+  const all=[...SLOTS.map(s=>['n'+s.no,s,day.entries['n'+s.no]]),...(day.extras||[]).map(x=>['x',{code:x.code,phys:EXTRA_PHYS},x])];
+  // Q-10 counts each tested item (M, CP, F, physical...) of non-外加 samples
+  for(const [,s,e] of all){if(!e||e.extra||e.ns)continue;
+    const slot=s.no?s:{...s,ca:0,fi:0};
+    for(const c of chemKeys(slot)){const v=num(e[c.k]);if(v==null)continue;n++;if(judge(v,chemStd(slot.code,c.k,slot),c.d)!==false)ok++}
+    for(const p of slot.phys){const v=num(e.p?.[p.k]);if(v==null)continue;n++;if(judge(v,p.r,2)!==false)ok++}}
+  return {n,ok};
+}
+
+// ---------- render ----------
+function fieldHTML(key,k,label,spec,val,d){
+  return `<div class="fld" data-f="${k}"><label for="${key}-${k}">${esc(label)}</label><input class="num" inputmode="decimal" id="${key}-${k}" data-k="${k}" value="${val??''}"><span class="spec">${esc(spec)}</span></div>`;
+}
+function cardHTML(key){
+  const s=slotFor(key), e=key.startsWith('x')?cur.extras.find(x=>x.id===key):entry(key);
+  const chem=chemKeys(s).map(c=>fieldHTML(key,c.k,c.l,ruleTxt(chemStd(s.code,c.k,s),c.d),e[c.k],c.d)).join('');
+  const phys=s.phys.map(p=>fieldHTML(key,'p.'+p.k,p.l+(p.u==='%'?' %':' '+p.u),ruleTxt(p.r,2),e.p?.[p.k],2)).join('');
+  const raw=e.raw||{};
+  let rawHTML='';
+  const sieves=s.phys.filter(p=>p.sieve), others=s.phys.filter(p=>!p.sieve);
+  if(s.phys.length){
+    let g='';
+    if(sieves.length){
+      g+=`<label class="fld"><span>樣品總重 g</span><input class="num" inputmode="decimal" id="${key}-r-wt" data-r="wt" value="${raw.wt??''}"></label>`;
+      for(const p of sieves) g+=`<label class="fld"><span>${esc(p.l)} 篩層重 g</span><input class="num" inputmode="decimal" id="${key}-r-${p.k}" data-r="${p.k}" value="${raw[p.k]??''}"></label>`;
+      g+=`<div class="formula">粗細度 = 該篩層重 ÷ 樣品總重 × 100</div>`;
+    }
+    for(const p of others){const R=RAW[p.k];if(!R)continue;
+      for(const [rk,rl] of R.f) g+=`<label class="fld"><span>${esc(p.l)}・${esc(rl)}</span><input class="num" inputmode="decimal" id="${key}-r-${p.k}-${rk}" data-r="${p.k}.${rk}" value="${raw[p.k]?.[rk]??''}"></label>`;
+      g+=`<div class="formula">${esc(R.txt)}</div>`;}
+    rawHTML=phItems(s).length?`<div class="status">物性可在上方「物性試驗計算」輸入秤重自動算出，也可以直接填結果。</div>`:'';
+  }
+  const nsOpts=NS_REASONS.map(r=>`<option${e.nsWhy===r?' selected':''}>${r}</option>`).join('');
+  return `<article class="card" id="card-${key}" data-key="${key}">
+    <div class="ch"><span class="no">(${s.no})</span><span class="pill mute">${esc(s.cat)}</span><span class="nm">${esc(s.name)}</span><span class="cd">${esc(s.code)}</span><span class="grow"></span><span class="pill" data-st></span>
+      ${s.extraSlot?`<button class="chipbtn" data-del>移除</button>`:''}</div>
+    ${s.note?`<div class="status">${esc(s.note)}</div>`:''}
+    <div class="nsrow"><label class="chk"><input type="checkbox" data-ns ${e.ns?'checked':''}> NO SAMPLE</label><select data-nswhy ${e.ns?'':'hidden'} aria-label="NO SAMPLE 原因">${nsOpts}</select></div>
+    <div class="meta">
+      <label>製造日期<input id="${key}-mfg" data-m="mfg" value="${esc(e.mfg??'')}" placeholder="11.03"></label>
+      <label>品管編號<input id="${key}-qc" data-m="qc" value="${esc(e.qc??'')}" placeholder="C302581"></label>
+      <label>項目<input id="${key}-item" data-m="item" value="${esc(e.item??'')}" placeholder="112桶"></label>
+      <label class="chk" style="align-self:end"><input type="checkbox" data-extra ${e.extra?'checked':''}> 外加</label>
+    </div>
+    <div class="fields">${chem}${phys}</div>
+    ${rawHTML}
+    <div class="cum" data-cum></div>
+  </article>`;
+}
+function renderAll(){
+  const groups={};for(const s of SLOTS)(groups[s.cat]??=[]).push(s);
+  $('#groups').innerHTML=Object.entries(groups).map(([cat,list])=>`<h2>${esc(cat)} <small>${list.length} 項</small></h2><div class="grid">${list.map(s=>cardHTML('n'+s.no)).join('')}</div>`).join('');
+  $('#extras').innerHTML=cur.extras.map(x=>cardHTML(x.id)).join('')||'<p class="status">今天沒有其他品項。</p>';
+  document.querySelectorAll('.card').forEach(refreshCard);
+  refreshSummary();
+  renderPhys();
+}
+function refreshCard(card){
+  const key=card.dataset.key, s=slotFor(key), e=key.startsWith('x')?cur.extras.find(x=>x.id===key):entry(key);
+  const r=evalEntry(s,e);
+  card.classList.toggle('ns',r.state==='ns');
+  card.classList.toggle('fail',r.state==='fail');
+  card.classList.toggle('pass',r.state==='pass'&&!e.extra);
+  card.classList.toggle('extra-on',r.state==='pass'&&!!e.extra);
+  const st=card.querySelector('[data-st]');
+  const map={ns:['mute','NO SAMPLE'+(e.nsWhy?'・'+e.nsWhy:'')],empty:['mute','待輸入'],pass:[e.extra?'warn':'ok',e.extra?'符合（外加，不計指數）':'○ 符合'],fail:['bad','× 超出標準']};
+  st.className='pill '+map[r.state][0]; st.textContent=map[r.state][1];
+  card.querySelectorAll('input,select').forEach(i=>{if(!i.matches('[data-ns],[data-nswhy]'))i.disabled=!!e.ns});
+  card.querySelector('[data-nswhy]').hidden=!e.ns;
+  for(const c of chemKeys(s)){const f=card.querySelector(`[data-f="${c.k}"]`);const j=judge(num(e[c.k]),chemStd(s.code,c.k,s),c.d);f.classList.toggle('bad',j===false);f.classList.toggle('ok',j===true)}
+  for(const p of s.phys){const f=card.querySelector(`[data-f="p.${p.k}"]`);const j=judge(num(e.p?.[p.k]),p.r,2);f.classList.toggle('bad',j===false);f.classList.toggle('ok',j===true)}
+  // monthly cumulative mean / sd
+  const ym=curDate.slice(0,7), vals={};
+  const monthDays=Object.values({...days,[curDate]:cur}).filter(d=>d.date.startsWith(ym)&&d.date<=curDate);
+  const fields=[...chemKeys(s).map(c=>[c.k,c.k,c.d]),...s.phys.map(p=>['p.'+p.k,p.l,2])];
+  for(const d of monthDays){
+    const ee=key.startsWith('x')?(d.extras||[]).filter(x=>x.code===s.code):[d.entries?.[key]].filter(Boolean);
+    for(const x of ee){if(x.ns)continue;for(const [k] of fields){const v=num(k.startsWith('p.')?x.p?.[k.slice(2)]:x[k]);if(v!=null)(vals[k]??=[]).push(v)}}
+  }
+  const parts=fields.filter(([k])=>vals[k]).map(([k,l,d])=>{const a=vals[k],sdv=sd(a);return `${esc(l)} ${mean(a).toFixed(d)}${sdv!=null?' ±'+sdv.toFixed(d):''}`});
+  const n=Math.max(0,...Object.values(vals).map(a=>a.length));
+  card.querySelector('[data-cum]').innerHTML=parts.length?`<b>本月累計 ㄡ ± σ（n=${n}）</b>${parts.map(p=>`<span>${p}</span>`).join('')}`:'<span>本月尚無累計數據</span>';
+}
+function refreshSummary(){
+  const d=dayIndex(cur);
+  $('#idxDay').textContent=d.n?(d.ok/d.n*100).toFixed(1)+'%':'–';
+  $('#idxDayN').textContent=d.n?`${d.ok}/${d.n} 項`:'';
+  const ym=curDate.slice(0,7);let n=0,ok=0;
+  for(const day of Object.values({...days,[curDate]:cur})){if(!day.date.startsWith(ym)||day.date>curDate)continue;const x=dayIndex(day);n+=x.n;ok+=x.ok}
+  $('#idxMon').textContent=n?(ok/n*100).toFixed(1)+'%':'–';
+  $('#idxMonN').textContent=n?`${ok}/${n} 項`:'';
+  $('#save').textContent=dirty?'儲存本日 •':'儲存本日';
+}
+function renderDates(){
+  const list=Object.keys(days).sort().reverse().slice(0,40);
+  $('#dates').innerHTML=list.length?list.map(d=>`<button class="chipbtn${d===curDate?' on':''}" data-date="${d}">${d.slice(5).replace('-','/')}</button>`).join(''):'<span class="status">還沒有儲存的日報。填好後按「儲存本日」。</span>';
+}
+
+// ---------- input handling ----------
+function onInput(ev){
+  const card=ev.target.closest('.card');if(!card)return;
+  const key=card.dataset.key, s=slotFor(key), e=key.startsWith('x')?cur.extras.find(x=>x.id===key):entry(key), t=ev.target;
+  if(t.dataset.m) e[t.dataset.m]=t.value;
+  else if(t.matches('[data-ns]')) e.ns=t.checked;
+  else if(t.matches('[data-nswhy]')) e.nsWhy=t.value;
+  else if(t.matches('[data-extra]')) e.extra=t.checked;
+  else if(t.dataset.k){const k=t.dataset.k;if(k.startsWith('p.'))(e.p??={})[k.slice(2)]=num(t.value);else e[k]=num(t.value)}
+  else if(t.dataset.r){
+    e.raw??={};const [a,b]=t.dataset.r.split('.');
+    if(b)(e.raw[a]??={})[b]=num(t.value);else e.raw[a]=num(t.value);
+    // recompute physical results from raw weights
+    for(const p of s.phys){
+      let v=null;
+      if(p.sieve){const wt=e.raw.wt,w=e.raw[p.k];if(wt>0&&w!=null)v=w/wt*100}
+      else if(RAW[p.k]){const rr=e.raw[p.k]||{};const need=RAW[p.k].f.every(([k])=>rr[k]!=null&&rr[k]!=='');if(need){const x=RAW[p.k].calc(rr);if(isFinite(x))v=x}}
+      if(v!=null){v=r_(v,2);(e.p??={})[p.k]=v;const inp=card.querySelector(`[data-k="p.${p.k}"]`);if(inp)inp.value=v}
+    }
+  }
+  if(e.ns&&!e.nsWhy)e.nsWhy=NS_REASONS[0];
+  dirty=true;saveDraft();refreshCard(card);refreshSummary();
+}
+document.addEventListener('input',onInput);
+document.addEventListener('change',ev=>{if(ev.target.type==='checkbox'||ev.target.tagName==='SELECT')onInput(ev)});
+document.addEventListener('click',ev=>{
+  const d=ev.target.closest('[data-date]');if(d){loadDate(d.dataset.date);return}
+  const del=ev.target.closest('[data-del]');if(del){const key=del.closest('.card').dataset.key;cur.extras=cur.extras.filter(x=>x.id!==key);dirty=true;saveDraft();renderAll()}
+});
+$('#date').addEventListener('change',e=>{if(e.target.value)loadDate(e.target.value)});
+$('#addCode').innerHTML=Object.entries(STD).map(([c,s])=>`<option value="${esc(c)}">${esc(c)}　${esc(s.name)}</option>`).join('');
+$('#addExtra').onclick=()=>{cur.extras.push({id:'x'+Date.now().toString(36),code:$('#addCode').value});dirty=true;saveDraft();renderAll()};
+
+// ---------- persistence ----------
+const LS='pt-qc-draft';
+function saveDraft(){try{localStorage.setItem(LS+':'+curDate,JSON.stringify(cur))}catch(e){}}
+function loadDraft(date){try{const v=localStorage.getItem(LS+':'+date);return v?JSON.parse(v):null}catch(e){return null}}
+function clearDraft(date){try{localStorage.removeItem(LS+':'+date)}catch(e){}}
+function loadDate(date){
+  curDate=date;$('#date').value=date;
+  const draft=loadDraft(date);
+  cur=draft||structuredClone(days[date]||blankDay(date));
+  cur.extras??=[];cur.entries??={};
+  dirty=!!draft;renderAll();renderDates();
+  if($('#nirDate'))$('#nirDate').textContent=date.slice(5).replace('-','/');
+}
+$('#save').onclick=async()=>{
+  cur.updated=new Date().toISOString();
+  const body=JSON.parse(JSON.stringify(cur));
+  if(!BACKEND){days[curDate]=body;try{localStorage.setItem(LS+':all',JSON.stringify(days))}catch(e){}clearDraft(curDate);dirty=false;toast('預覽模式：只存在這台裝置');refreshSummary();renderDates();return}
+  $('#save').disabled=true;$('#save').textContent='儲存中…';
+  try{
+    const t=tableRows(cur);
+    await gs('saveDay',curDate,JSON.stringify(body),t.header,t.rows,dayIndex(cur));
+    days[curDate]=body;clearDraft(curDate);dirty=false;toast('已儲存到 Google 試算表：'+curDate);
+  }catch(e){toast('儲存失敗：'+(e?.message||e))}
+  finally{$('#save').disabled=false}
+  refreshSummary();renderDates();
+};
+
+// ---------- table rows (export + 明細 sheet) ----------
+function tableRows(day){
+  const header=['料別','品名','代號','製造日期','品管編號','項目','外加','M%','M標準','CP%','CP標準','F%','F標準','Ca%','Ca標準','Fi%','物性1','結果','標準','物性2','結果','標準','物性3','結果','標準','物性4','結果','標準','判定'];
+  const rows=[];
+  const keys=[...SLOTS.map(s=>'n'+s.no),...(day.extras||[]).map(x=>x.id)];
+  for(const key of keys){
+    const s=slotFor(key),e=key.startsWith('x')?day.extras.find(x=>x.id===key):(day.entries[key]||{});
+    const r=evalEntry(s,e);
+    const c=k=>{const v=num(e[k]);return v==null?'':v};
+    const st=k=>{const cd=CHEM.find(x=>x.k===k).d;return chemKeys(s).some(x=>x.k===k)?ruleTxt(chemStd(s.code,k,s),cd):''};
+    const ph=[];for(const p of s.phys){ph.push(p.l,num(e.p?.[p.k])??'',ruleTxt(p.r,2))}
+    while(ph.length<12)ph.push('');
+    rows.push([`(${s.no})${s.cat}`,s.name,s.code,e.mfg||'',e.qc||'',e.item||'',e.extra?'外加':'',
+      e.ns?'NO SAMPLE':c('M'),st('M'),e.ns?'':c('CP'),st('CP'),e.ns?'':c('F'),st('F'),e.ns?'':c('Ca'),st('Ca'),e.ns?'':c('Fi'),...ph,
+      {ns:'NO SAMPLE'+(e.nsWhy?'('+e.nsWhy+')':''),empty:'',pass:'○',fail:'×'}[r.state]]);
+  }
+  return {header,rows};
+}
+
+// ---------- export ----------
+$('#export').onclick=()=>{
+  if(!window.XLSX){toast('Excel 元件未載入');return}
+  const t=tableRows(cur);
+  const rows=[['屏東飼料廠飼料製程與成品品質化驗日報表'],[rocDate(curDate)],[],t.header,...t.rows];
+  const d=dayIndex(cur);
+  rows.push([],['本日品質指數',d.n?d.ok/d.n:'', `符合 ${d.ok} / 抽檢 ${d.n}`],['表單編號: Q-10 Rev.4（線上版匯出）']);
+  const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:10},{wch:14},{wch:8},{wch:8},{wch:10},{wch:12}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'屏東廠');
+  XLSX.writeFile(wb,`屏東廠製程日報_${curDate}.xlsx`);
+};
+
+// ---------- physical test calculator ----------
+const PHT=[
+ {id:'mash',l:'雞粉料',f:s=>s.phys.some(p=>p.k==='s6'),txt:'粗細度 % = 篩層重 ÷ 樣品淨重 × 100　（樣品淨重 = 樣品總重 − 袋重）　種19 比重直接填入 g/ml'},
+ {id:'crumb',l:'碎粒料',f:s=>s.phys.some(p=>p.k==='sA'),txt:'粗細度 % = 篩上（或篩下）重 ÷ 樣品淨重 × 100　（樣品淨重 = 樣品總重 − 袋重）'},
+ {id:'pellet',l:'粒料',f:s=>s.phys.some(p=>p.k==='fines'),txt:'含粉率 % = 篩下細粉重 ÷ 樣品淨重 × 100　（樣品淨重 = 樣品總重 − 袋重）　堅牢度直接填入測定結果 %'}];
+let phTab='mash',phAll=false;
+const getE=k=>k.startsWith('x')?cur.extras.find(x=>x.id===k):entry(k);
+const DIRECT=['pdi','bd'];
+const phItems=s=>s.phys.filter(p=>p.k!=='bd');
+const phCalcItems=s=>s.phys.filter(p=>!DIRECT.includes(p.k));
+const phDirect=s=>s.phys.filter(p=>DIRECT.includes(p.k));
+function measLabel(p){
+  const fixed={s6:'6目篩上重',s610:'10目篩上重（6~10目）',s35:'35目篩下重（底盤）',fines:'篩下細粉重'};
+  if(fixed[p.k])return fixed[p.k];
+  const m=p.l.match(/([<>])(\d+)目/);return m?`${m[2]}目篩${m[1]==='>'?'上':'下'}重`:p.l+'重';
+}
+function phCalc(slot,e){
+  const r=e.phr||{},out={},bag=num(r.bag),gross=num(r.gross);
+  if(gross==null||bag==null)return {net:null,missing:gross!=null&&bag==null,out};
+  const net=gross-bag;if(!(net>0))return {net,out};
+  const adj=v=>{v=num(v);return v==null?null:(cur.phTareIn?v-bag:v)};
+  for(const p of phCalcItems(slot)){const m=adj(r.w?.[p.k]);if(m!=null)out[p.k]=r_(m/net*100,2)}
+  return {net,out};
+}
+function phFormula(){const t=PHT.find(x=>x.id===phTab);$('#phFormula').textContent=t.txt+(cur.phTareIn?'　（秤量重量已扣袋重）':'')}
+function renderPhys(){
+  const t=PHT.find(x=>x.id===phTab);
+  $('#phTabs').innerHTML=PHT.map(x=>`<button class="chipbtn${x.id===phTab?' on':''}" data-phtab="${x.id}">${x.l}</button>`).join('');
+  phFormula();$('#phTare').checked=!!cur.phTareIn;$('#phAll').checked=phAll;
+  const keys=SLOTS.filter(t.f).map(s=>'n'+s.no);if(phTab==='pellet')keys.push(...cur.extras.map(x=>x.id));
+  const list=keys.filter(k=>phAll||!getE(k).ns);
+  $('#phList').innerHTML=list.length?list.map(k=>{const s=slotFor(k),e=getE(k),r=e.phr||{};
+    return `<div class="phrow${e.ns?' ns':''}" data-phkey="${k}">
+      <div class="ch"><span class="no">(${s.no})</span><span class="nm">${esc(s.name)}</span><span class="cd">${esc(s.code)}</span>${e.ns?'<span class="pill mute">NO SAMPLE</span>':''}<span class="grow"></span><span class="status">淨重 <b class="numt" data-net>–</b></span></div>
+      <div class="phgrid">
+        <label class="phf"><span>樣品總重 g</span><input class="num" inputmode="decimal" id="ph-${k}-gross" data-ph="gross" value="${r.gross??''}"></label>
+        <label class="phf"><span>袋重 g</span><input class="num" inputmode="decimal" id="ph-${k}-bag" data-ph="bag" value="${r.bag??''}"></label>
+        ${phCalcItems(s).map(p=>`<div class="phf"><label for="ph-${k}-${p.k}">${esc(measLabel(p))} g</label><input class="num" inputmode="decimal" id="ph-${k}-${p.k}" data-ph="w.${p.k}" value="${r.w?.[p.k]??''}"><span class="res" data-res="${p.k}"></span></div>`).join('')}
+        ${phDirect(s).map(p=>`<div class="phf"><label for="ph-${k}-${p.k}">${p.k==='pdi'?'堅牢度 %（直接填）':'比重 g/ml（直接填）'}</label><input class="num" inputmode="decimal" id="ph-${k}-${p.k}" data-ph="d.${p.k}" value="${e.p?.[p.k]??''}"><span class="res" data-res="${p.k}"></span></div>`).join('')}
+      </div></div>`}).join(''):'<p class="status">今天這一類沒有樣品。勾選「顯示 NO SAMPLE 品項」可以看到全部。</p>';
+  document.querySelectorAll('.phrow').forEach(row=>phRefresh(row,false));
+}
+function phRefresh(row,write){
+  const k=row.dataset.phkey,s=slotFor(k),e=getE(k),{net,missing,out}=phCalc(s,e);
+  row.querySelector('[data-net]').textContent=missing?'請填袋重':net==null?'–':(net>0?r_(net,2)+' g':'袋重大於總重');
+  for(const p of s.phys){
+    const cell=row.querySelector(`[data-res="${p.k}"]`);if(!cell)continue;
+    const direct=DIRECT.includes(p.k),v=direct?num(e.p?.[p.k]):out[p.k],unit=p.u==='%'?'%':' '+p.u;
+    if(v==null){cell.innerHTML=`<span class="spec">${direct?'':esc(p.l)+' '}標準 ${esc(ruleTxt(p.r,2))}</span>`;continue}
+    const ok=judge(v,p.r,2);
+    cell.innerHTML=`<b class="${ok?'okt':'badt'}">${direct?'':esc(p.l)+' '}${direct?v:v.toFixed(2)}${unit}</b><span class="spec">${esc(ruleTxt(p.r,2))}</span><span class="pill ${ok?'ok':'bad'}">${ok?'○':'×'}</span>`;
+    if(write&&!direct){(e.p??={})[p.k]=v;const inp=document.querySelector(`#card-${k} [data-k="p.${p.k}"]`);if(inp)inp.value=v}
+  }
+  if(write){const card=document.getElementById('card-'+k);if(card)refreshCard(card);refreshSummary()}
+}
+function phInput(ev){
+  const t=ev.target;
+  if(t.id==='phAll'){phAll=t.checked;renderPhys();return}
+  if(t.id==='phTare'){cur.phTareIn=t.checked;phFormula();document.querySelectorAll('.phrow').forEach(r=>phRefresh(r,true))}
+  else{
+    const row=t.closest('.phrow');if(!row||!t.dataset.ph)return;
+    const k=row.dataset.phkey,e=getE(k),f=t.dataset.ph;e.phr??={};
+    if(f.startsWith('w.'))(e.phr.w??={})[f.slice(2)]=num(t.value);
+    else if(f.startsWith('d.')){const pk=f.slice(2);(e.p??={})[pk]=num(t.value);const inp=document.querySelector(`#card-${k} [data-k="p.${pk}"]`);if(inp)inp.value=t.value}
+    else e.phr[f]=num(t.value);
+    phRefresh(row,true);
+  }
+  dirty=true;saveDraft();refreshSummary();
+}
+$('#phys').addEventListener('input',phInput);
+$('#phys').addEventListener('change',e=>{if(e.target.type==='checkbox')phInput(e)});
+$('#phys').addEventListener('click',e=>{const b=e.target.closest('[data-phtab]');if(b){phTab=b.dataset.phtab;renderPhys()}});
+
+// ---------- NIR Excel import ----------
+const nz=s=>String(s??'').normalize('NFKC').replace(/\s+/g,'');
+const CANDS=[...SLOTS.map(s=>({n:nz(s.name),key:'n'+s.no,pri:1})),...Object.entries(STD).map(([c,s])=>({n:nz(s.name).replace(/\([^)]*\)/g,''),code:c,pri:0}))]
+  .filter(c=>c.n).sort((a,b)=>b.n.length-a.n.length||b.pri-a.pri);
+function matchLabel(label){
+  const L=nz(label);const c=CANDS.find(c=>L.startsWith(c.n));if(!c)return '';
+  if(c.key)return c.key;
+  const slot=SLOTS.find(s=>s.code===c.code);return slot?'n'+slot.no:'new:'+c.code;
+}
+const TARGET_OPTS='<option value="">— 不套用 —</option><optgroup label="日報固定品項">'+SLOTS.map(s=>`<option value="n${s.no}">(${s.no}) ${esc(s.name)}</option>`).join('')+'</optgroup><optgroup label="其他（依標準表代號）">'+Object.entries(STD).filter(([c])=>!SLOTS.some(s=>s.code===c)).map(([c,s])=>`<option value="new:${esc(c)}">${esc(c)} ${esc(s.name)}</option>`).join('')+'</optgroup>';
+let nirRows=[];
+async function parseNir(file){
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null,raw:true});
+  const hi=aoa.findIndex(r=>r&&r.some(v=>/样品|樣品|品名/.test(String(v??''))));
+  if(hi<0)throw new Error('找不到「樣品編號」欄位，請確認是 NIR 匯出的檔案');
+  const H=aoa[hi].map(v=>nz(v).toLowerCase());
+  const col=re=>H.findIndex(h=>re.test(h));
+  const c={label:col(/样品|樣品|品名/),M:col(/^m%?$|水分|水份|moist/),CP:col(/^cp%?$|蛋白|protein/),F:col(/^f%?$|^fat|脂肪/),Ash:col(/^ash|灰分/),Ca:col(/^ca%?$|鈣|钙/),Fi:col(/^fi%?$|纖維|纤维|fiber/),qc:col(/品管/),item:col(/^項目|^项目/),bd:col(/比重|容重/)};
+  const phys=H.map((h,i)=>/粗細|粗细|含粉|堅牢|坚牢/.test(h)?i:-1).filter(i=>i>=0);
+  const g=(r,i)=>i>=0?r[i]:null;
+  return aoa.slice(hi+1).filter(r=>r&&nz(g(r,c.label))).map(r=>{
+    const label=String(g(r,c.label)).trim(), item=g(r,c.item)!=null?String(g(r,c.item)).trim():'';
+    const md=label.match(/(\d{1,2})\s*\/\s*(\d{1,2})/);
+    return {label,target:matchLabel(label),qc:g(r,c.qc)?String(g(r,c.qc)).trim().toUpperCase():'',item,extra:/外加/.test(item),
+      mfg:md?`${md[1]}.${md[2].padStart(2,'0')}`:'',M:num(g(r,c.M)),CP:num(g(r,c.CP)),F:num(g(r,c.F)),Ash:num(g(r,c.Ash)),Ca:num(g(r,c.Ca)),Fi:num(g(r,c.Fi)),
+      phys:phys.map(i=>num(r[i])),bd:num(g(r,c.bd))};
+  });
+}
+function physFor(target){return target.startsWith('new:')?EXTRA_PHYS:slotFor(target).phys}
+function mapPhys(target,r){
+  // NIR sheet puts physical results right-aligned in the 粗細度 columns: 3 sieve values for mash, 2 for pellet/crumble
+  const list=physFor(target).filter(p=>p.k!=='bd'),out={},off=r.phys.length-list.length;
+  list.forEach((p,i)=>{const v=r.phys[off+i];if(off+i>=0&&v!=null)out[p.k]=v});
+  if(r.bd!=null&&physFor(target).some(p=>p.k==='bd'))out.bd=r.bd;
+  return out;
+}
+function physTxt(target,r){
+  if(!target)return r.phys.filter(v=>v!=null).join(' / ');
+  const m=mapPhys(target,r);return physFor(target).filter(p=>m[p.k]!=null).map(p=>`${p.l} ${m[p.k]}`).join('、')||'—';
+}
+function showNir(){
+  const f=v=>v==null?'':esc(v);
+  $('#xlsResult').innerHTML=`<div class="tbl"><table><thead><tr><th>樣品編號</th><th>對應到</th><th>品管編號</th><th>製造日期</th><th>項目</th><th>M</th><th>CP</th><th>F</th><th>物性</th></tr></thead><tbody>${
+    nirRows.map((r,i)=>`<tr><td>${f(r.label)}</td><td><select data-nir="${i}" aria-label="第${i+1}筆對應品項">${TARGET_OPTS}</select></td><td>${f(r.qc)}</td><td>${f(r.mfg)}</td><td>${f(r.item)}${r.extra?' <span class="pill warn">外加</span>':''}</td><td class="n">${f(r.M)}</td><td class="n">${f(r.CP)}</td><td class="n">${f(r.F)}</td><td data-ph="${i}">${esc(physTxt(r.target,r))}</td></tr>`).join('')
+  }</tbody></table></div><div class="ai-row"><button class="primary" id="nirApply">套用到 <span id="nirDate"></span> 日報</button><button id="nirClear">清除</button><span class="status">只會覆寫檔案裡有數值的欄位</span></div>`;
+  document.querySelectorAll('[data-nir]').forEach(sel=>{sel.value=nirRows[+sel.dataset.nir].target;sel.onchange=()=>{const r=nirRows[+sel.dataset.nir];r.target=sel.value;$(`[data-ph="${sel.dataset.nir}"]`).textContent=physTxt(r.target,r)}});
+  $('#nirDate').textContent=curDate.slice(5).replace('-','/');
+  $('#nirApply').onclick=applyNir;
+  $('#nirClear').onclick=()=>{nirRows=[];$('#xlsResult').innerHTML='';$('#xlsMsg').textContent='';$('#xlsFile').value=''};
+}
+$('#xlsFile').addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  if(!window.XLSX){$('#xlsMsg').textContent='Excel 元件未載入，請重新整理頁面';return}
+  try{
+    nirRows=await parseNir(file);
+    const miss=nirRows.filter(r=>!r.target).length;
+    let msg=`讀到 ${nirRows.length} 筆樣品`+(miss?`，${miss} 筆對不到品項，請手動選擇`:'，全部已對應');
+    const fm=file.name.match(/(?:^|\D)(0[1-9]|1[0-2])([0-3]\d)(?=\D)/);
+    if(fm){const d=`${curDate.slice(0,4)}-${fm[1]}-${fm[2]}`;if(d!==curDate)msg+=`。檔名看起來是 ${fm[1]}/${fm[2]} 的日報 <button class="chipbtn" data-date="${d}">切換到 ${fm[1]}/${fm[2]}</button>`}
+    $('#xlsMsg').innerHTML=msg;showNir();
+  }catch(err){nirRows=[];$('#xlsResult').innerHTML='';$('#xlsMsg').textContent='讀取失敗：'+(err?.message||err)}
+});
+function applyNir(){
+  let n=0;
+  for(const r of nirRows){
+    if(!r.target)continue;
+    let e;
+    if(r.target.startsWith('new:')){const code=r.target.slice(4);e=cur.extras.find(x=>x.code===code&&(!x.qc||x.qc===r.qc));if(!e){e={id:'x'+Date.now().toString(36)+n,code};cur.extras.push(e)}}
+    else e=entry(r.target);
+    e.ns=false;
+    for(const k of ['M','CP','F','Ca','Fi'])if(r[k]!=null)e[k]=r[k];
+    if(r.qc)e.qc=r.qc;if(r.mfg)e.mfg=r.mfg;if(r.item)e.item=r.item;e.extra=r.extra;
+    e.p={...(e.p||{}),...mapPhys(r.target,r)};
+    n++;
+  }
+  dirty=true;saveDraft();renderAll();toast(`已填入 ${n} 筆，請檢查紅框欄位後按「儲存本日」`);
+}
+
+// ---------- AI recognition (Gemini via Apps Script, optional) ----------
+let aiOn=false, aiFiles=[], aiRows=[];
+$('#aiFile').addEventListener('change',e=>{
+  aiFiles=[...e.target.files].slice(0,5);
+  $('#aiThumbs').innerHTML='';
+  for(const f of aiFiles){const img=document.createElement('img');img.alt=f.name;img.src=URL.createObjectURL(f);$('#aiThumbs').append(img)}
+  $('#aiGo').disabled=!aiFiles.length||!aiOn;
+});
+function productList(){return Object.entries(STD).map(([c,s])=>`${c}\t${s.name}`).join('\n')}
+function shrink(file){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const k=Math.min(1,1800/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res({mime:'image/jpeg',data:c.toDataURL('image/jpeg',0.85).split(',')[1]})};img.onerror=rej;img.src=URL.createObjectURL(file)})}
+$('#aiGo').onclick=async()=>{
+  if(!aiOn||!aiFiles.length)return;
+  $('#aiGo').disabled=true;$('#aiMsg').textContent='辨識中，約需 10–40 秒…';$('#aiResult').innerHTML='';
+  const prompt=`你是飼料廠品管助理。附圖是近紅外線(NIR)分析儀的結果畫面、列印單或手寫紀錄。請讀出每一個樣品的分析值。
+規則：
+- 只抄寫圖上看得到的數字，看不清楚就填 null，不要推測。
+- 欄位對應：水分/Moisture→M，粗蛋白/Protein/CP→CP，粗脂肪/Fat/F→F，灰分/Ash→Ash，鈣/Ca→Ca，纖維/Fiber→Fi。
+- code 請比對下方產品清單填入產品代號；圖上的樣品名稱或代號對不上任何一項時填 null。
+- qc 是品管編號（例如 C302581），mfg 是製造日期（例如 11.03），沒有就 null。
+只回覆 JSON 陣列，例如：[{"label":"圖上樣品名稱","code":"12591","qc":"C302581","mfg":"11.03","M":11.8,"CP":17.3,"F":5.3,"Ash":null,"Ca":null,"Fi":null}]
+
+產品清單（代號<TAB>名稱）：
+${productList()}`;
+  try{
+    const imgs=await Promise.all(aiFiles.map(shrink));
+    const txt=await gs('aiExtract',prompt,imgs);
+    let out;try{out=JSON.parse(txt)}catch(e){const m=String(txt).match(/\[[\s\S]*\]/);out=m?JSON.parse(m[0]):[]}
+    aiRows=(Array.isArray(out)?out:[]).filter(x=>x&&typeof x==='object');
+    showAiRows();
+    $('#aiMsg').textContent=aiRows.length?`讀到 ${aiRows.length} 筆，請核對後套用。`:'圖上沒有讀到樣品數據，換一張清楚一點的照片再試。';
+  }catch(e){$('#aiMsg').textContent='辨識失敗：'+(e?.message||e)}
+  finally{$('#aiGo').disabled=!aiFiles.length}
+};
+function targetFor(row){
+  const code=row.code!=null?String(row.code).trim():null;
+  const slot=code&&SLOTS.find(s=>s.code===code);
+  if(slot)return {key:'n'+slot.no,label:`(${slot.no}) ${slot.name}`};
+  if(code&&STD[code])return {key:'new:'+code,label:`其他：${STD[code].name}`};
+  return null;
+}
+function showAiRows(){
+  if(!aiRows.length){$('#aiResult').innerHTML='';return}
+  const f=v=>v==null?'':esc(v);
+  $('#aiResult').innerHTML=`<div class="tbl"><table><thead><tr><th>套用</th><th>圖上名稱</th><th>對應欄位</th><th>品管編號</th><th>製造日期</th><th>M</th><th>CP</th><th>F</th><th>Ash</th><th>Ca</th><th>Fi</th></tr></thead><tbody>${
+    aiRows.map((r,i)=>{const t=targetFor(r);return `<tr><td><input type="checkbox" data-ai="${i}" ${t?'checked':'disabled'} aria-label="套用第${i+1}筆"></td><td>${f(r.label)}</td><td>${t?esc(t.label):'<span class="pill bad">對不到代號</span>'}</td><td>${f(r.qc)}</td><td>${f(r.mfg)}</td><td class="n">${f(r.M)}</td><td class="n">${f(r.CP)}</td><td class="n">${f(r.F)}</td><td class="n">${f(r.Ash)}</td><td class="n">${f(r.Ca)}</td><td class="n">${f(r.Fi)}</td></tr>`}).join('')
+  }</tbody></table></div><div class="ai-row"><button class="primary" id="aiApply">套用勾選的資料</button><span class="status">只會覆寫有讀到數值的欄位</span></div>`;
+  $('#aiApply').onclick=applyAi;
+}
+function applyAi(){
+  let n=0;
+  document.querySelectorAll('[data-ai]:checked').forEach(cb=>{
+    const r=aiRows[+cb.dataset.ai],t=targetFor(r);if(!t)return;
+    let e;
+    if(t.key.startsWith('new:')){e={id:'x'+Date.now().toString(36)+n,code:t.key.slice(4)};cur.extras.push(e)}else e=entry(t.key);
+    e.ns=false;
+    for(const k of ['M','CP','F','Ca','Fi']){const v=num(r[k]);if(v!=null)e[k]=v}
+    if(r.qc)e.qc=String(r.qc);if(r.mfg)e.mfg=String(r.mfg);n++;
+  });
+  dirty=true;saveDraft();renderAll();toast(`已填入 ${n} 筆，請檢查紅框欄位`);
+}
+
+// ---------- boot (Google Apps Script) ----------
+async function loadDays(first){
+  try{
+    const list=await gs('listDays');
+    days={};for(const d of list){try{const v=JSON.parse(d);if(v&&v.date)days[v.date]=v}catch(e){}}
+    $('#store').textContent=`Google 試算表 · ${Object.keys(days).length} 天`;
+    if(first&&!days[curDate]&&!dirty){const last=Object.keys(days).sort().pop();if(last){loadDate(last);return}}
+    if(!dirty){cur=structuredClone(days[curDate]||blankDay(curDate));cur.extras??=[];cur.entries??={};renderAll()}
+    else{document.querySelectorAll('.card').forEach(refreshCard);refreshSummary()}
+    renderDates();
+  }catch(e){$('#store').textContent='讀取試算表失敗：'+(e?.message||e)}
+}
+loadDate(curDate);
+renderDates();
+if(BACKEND){
+  $('#store').textContent='讀取 Google 試算表…';
+  loadDays(true);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadDays(false)});
+  gs('aiEnabled').then(on=>{aiOn=!!on;if(!aiOn){$('#aiPanel').querySelector('p').textContent='AI 照片辨識尚未啟用（需要在 Apps Script 設定 GEMINI_API_KEY）。請改用上傳 NIR Excel 或手動輸入。';$('#aiFile').disabled=true}}).catch(()=>{});
+}else{
+  try{const all=JSON.parse(localStorage.getItem(LS+':all')||'null');if(all)days=all}catch(e){}
+  $('#store').textContent='預覽模式（未連線 Google 試算表）';$('#aiPanel').hidden=true;renderDates();
+}
+</script>
+
+
+</body>
+</html>
