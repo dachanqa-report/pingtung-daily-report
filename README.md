@@ -1,6 +1,6 @@
 # 屏東飼料廠 製程與成品品質化驗日報（Q-10）線上版
 
-網頁版製程日報：上傳 NIR 匯出 Excel 自動填入、物性試驗（粗細度、含粉率、堅牢度、比重）計算、依 R-20 製程管制標準自動判定、品質指數與本月累計平均／標準差、匯出 Excel。資料存在 Google 試算表。
+網頁版製程日報：上傳 NIR 匯出 Excel 自動填入、物性試驗（粗細度、含粉率、堅牢度、比重）計算、依 R-20 製程管制標準自動判定、品質指數與本月累計平均／標準差、匯出與原 Q-10 日報相同格式的 Excel。資料存在 Google 試算表。
 
 ## 網址
 - GitHub Pages：https://dachanqa-report.github.io/pingtung-daily-report/
@@ -8,7 +8,8 @@
 
 ## 檔案
 - `index.html`：網頁（在 Apps Script 內用 google.script.run，在 GitHub Pages 上透過 Apps Script 網址的 POST API 存取試算表）
-- `apps-script/Code.gs`：Apps Script 後端（試算表讀寫、doPost API、選用的 Gemini AI 照片辨識）
+- `Code.gs`：Apps Script 後端（試算表讀寫、doPost API、選用的 Gemini AI 照片辨識）
+- `q10-template.xlsx`：Q-10 日報空白範本（由「屏東廠製程日報1151103.xlsx」的屏東廠工作表清除數據而成），匯出 Excel 時填入數值，格式與原表相同
 
 ## 更新方式
 1. 在 Apps Script 編輯器修改程式碼.gs／index.html 後存檔
