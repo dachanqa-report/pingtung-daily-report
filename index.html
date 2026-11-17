@@ -148,6 +148,13 @@ details.raw summary{cursor:pointer;color:var(--accent)}
       <span class="status" id="rptMsg"></span>
     </div>
     <div id="rptResult"></div>
+    <div class="ai-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line,#ddd)">
+      <span>刪除某一天的日報</span>
+      <select id="delDate"></select>
+      <button id="delBtn" style="color:var(--bad);border-color:var(--bad)">刪除</button>
+      <span class="status" id="delMsg"></span>
+    </div>
+    <p class="status" style="margin:6px 0 0">刪除後，該日資料會從「日報資料」「明細」和該月 data 分頁一併移除。資料有錯時，可先刪除再上傳正確的日報（或勾選「以檔案內容覆蓋」），儲存後會重新合併到 data 分頁。</p>
   </div>
 
   <div class="panel" id="stdPanel">
@@ -412,7 +419,27 @@ function refreshSummary(){
 function renderDates(){
   const list=Object.keys(days).sort().reverse().slice(0,40);
   $('#dates').innerHTML=list.length?list.map(d=>`<button class="chipbtn${d===curDate?' on':''}" data-date="${d}">${d.slice(5).replace('-','/')}</button>`).join(''):'<span class="status">還沒有儲存的日報。填好後按「儲存本日」。</span>';
+  const ds=$('#delDate');if(ds){const keep=ds.value;const all=Object.keys(days).sort().reverse();
+    ds.innerHTML=all.length?all.map(d=>`<option value="${d}">${rocDate(d)}</option>`).join(''):'<option value="">（沒有已儲存的日報）</option>';
+    ds.value=all.includes(keep)?keep:(all.includes(curDate)?curDate:(all[0]||''));$('#delBtn').disabled=!all.length}
 }
+// 刪除某天日報（按兩次確認）
+$('#delBtn').onclick=async()=>{
+  const btn=$('#delBtn'),d=$('#delDate').value;if(!d)return;
+  if(btn.dataset.arm!==d){btn.dataset.arm=d;btn.textContent=`確定刪除 ${d.slice(5).replace('-','/')}？再按一次`;clearTimeout(btn._t);
+    btn._t=setTimeout(()=>{delete btn.dataset.arm;btn.textContent='刪除'},6000);return}
+  clearTimeout(btn._t);delete btn.dataset.arm;btn.disabled=true;btn.textContent='刪除中…';
+  try{
+    const map={...days};delete map[d];
+    if(BACKEND)await gs('deleteDay',d,dataPayload(d.slice(0,7),map));
+    delete days[d];clearDraft(d);
+    if(!BACKEND)try{localStorage.setItem(LS+':all',JSON.stringify(days))}catch(e){}
+    if(curDate===d){cur=blankDay(d);dirty=false;renderAll()}
+    if(BACKEND)$('#store').textContent=`Google 試算表 · ${Object.keys(days).length} 天`;
+    $('#delMsg').textContent=`已刪除 ${rocDate(d)} 日報`;toast(`已刪除 ${d.slice(5).replace('-','/')} 日報，data 分頁已更新`);
+  }catch(e){toast('刪除失敗：'+(e?.message||e))}
+  finally{btn.disabled=false;btn.textContent='刪除';refreshSummary();renderDates()}
+};
 
 // ---------- input handling ----------
 function onInput(ev){
@@ -467,8 +494,8 @@ $('#save').onclick=async()=>{
   $('#save').disabled=true;$('#save').textContent='儲存中…';
   try{
     const t=tableRows(cur);
-    await gs('saveDay',curDate,JSON.stringify(body),t.header,t.rows,dayIndex(cur));
-    days[curDate]=body;clearDraft(curDate);dirty=false;toast('已儲存到 Google 試算表：'+curDate);
+    await gs('saveDay',curDate,JSON.stringify(body),t.header,t.rows,dayIndex(cur),dataPayload(curDate.slice(0,7),{...days,[curDate]:body}));
+    days[curDate]=body;clearDraft(curDate);dirty=false;toast('已儲存到 Google 試算表（含本月 data 分頁）：'+curDate);
   }catch(e){toast('儲存失敗：'+(e?.message||e))}
   finally{$('#save').disabled=false}
   refreshSummary();renderDates();
@@ -491,6 +518,47 @@ function tableRows(day){
       {ns:'NO SAMPLE'+(e.nsWhy?'('+e.nsWhy+')':''),empty:'',pass:'○',fail:'×'}[r.state]]);
   }
   return {header,rows};
+}
+
+// ---------- Google 試算表的 data 分頁（每月一個，儲存/刪除日報時重建；平均值、標準差用公式，試算表自動計算）----------
+function dataPayload(ym,dayMap){
+  const [y,m]=ym.split('-'),C='ABCDEFGHIJKLMNOPQRST'.split(''),W=C.length;
+  const md=Object.values(dayMap).filter(d=>d&&d.date&&d.date.startsWith(ym)).sort((a,b)=>a.date<b.date?-1:1);
+  const grid=[],bold=[],title=[],stat=[],red=[];
+  const row=()=>{const r=Array(W).fill('');grid.push(r);return r};
+  const put=(r,col,v)=>{if(col)r[C.indexOf(col)]=v??''};
+  const mmdd=iso=>iso.slice(5).replace('-','/');
+  let r=row();r[0]=`屏東廠飼料製程與成品品質化驗明細表（${+y-1911}年${m}月）`;bold.push(1);
+  r=row();r[0]=`本月日報 ${md.length} 天：${md.map(d=>mmdd(d.date)).join('、')||'無'}　（網頁儲存或刪除日報時自動更新，請勿手動修改）`;
+  const block=(label,s,colOf,list,isOther)=>{
+    row();
+    let t=row();t[0]=label;if(!isOther)put(t,'B',s.code+' '+shortName(s.code));title.push(grid.length);bold.push(grid.length);
+    const h=row();put(h,'A','日報日期');put(h,'C','製造日期');put(h,'D','品管編號');put(h,'F','項目');if(isOther){put(h,'B','品名');put(h,'S','標準')}
+    const cols=[];
+    for(const c of chemKeys(s)){const col=colOf(c.k);if(col){put(h,col,c.l.split(' ')[0]);cols.push(col)}}
+    for(const p of s.phys){const col=colOf('p.'+p.k);if(col){put(h,col,p.l);cols.push(col)}}
+    bold.push(grid.length);
+    if(!isOther){const st=row();put(st,'C','標準');
+      for(const c of chemKeys(s))put(st,colOf(c.k),ruleTxt(chemStd(s.code,c.k,s),c.d));
+      for(const p of s.phys)put(st,colOf('p.'+p.k),ruleTxt(p.r,2))}
+    const a=grid.length+1;
+    for(const {d,e} of list){const x=row(),rn=grid.length;const ss=isOther?{code:e.code,phys:EXTRA_PHYS,ca:0,fi:0}:s;
+      put(x,'A',mmdd(d.date));put(x,'C',e.mfg||'');put(x,'D',e.qc||'');put(x,'F',itemTxt(e));
+      if(isOther){put(x,'B',shortName(e.code));put(x,'S',stdNote(e.code)||'')}
+      for(const [col,v,bad] of sampleCells(ss,e,colOf)){put(x,col,v);if(bad)red.push(col+rn)}}
+    if(!list.length){const x=row();put(x,'C','本月無樣品')}
+    if(isOther)return;
+    const b=grid.length,mr=row(),sr=row();put(mr,'C','累計平均值 ㄡ');put(sr,'C','累計標準差 σ');
+    for(const col of cols){const rg=`${col}${a}:${col}${b}`;
+      put(mr,col,`=IF(COUNT(${rg})=0,"",AVERAGE(${rg}))`);put(sr,col,`=IF(COUNT(${rg})<2,"",STDEV(${rg}))`)}
+    stat.push(grid.length-1,grid.length);
+  };
+  const phys=k=>k.startsWith('p.')?PHYS_COL[k.slice(2)]:CHEM_COL[k];
+  for(const s of SLOTS){const k='n'+s.no;
+    block(`(${s.no})${s.cat}`,s,phys,md.map(d=>({d,e:d.entries?.[k]})).filter(o=>o.e&&!o.e.ns&&hasData(s,o.e)),false)}
+  const oth=[];for(const d of md)for(const e of d.extras||[]){if(!e.ns&&hasData({code:e.code,phys:EXTRA_PHYS,ca:0,fi:0},e))oth.push({d,e})}
+  block('(24)其他',{code:'',phys:EXTRA_PHYS,ca:0,fi:0},k=>XCOL[k]||null,oth,true);
+  return JSON.stringify({name:`data ${+y-1911}.${m}`,grid,bold,title,stat,red});
 }
 
 // ---------- export (Q-10 原始日報格式：屏東廠 / data / Sheet1 三個分頁) ----------
@@ -1128,6 +1196,7 @@ $('#rptFile').addEventListener('change',async e=>{
     ${r.warn.length?`<p class="status">${r.warn.map(esc).join('<br>')}</p>`:''}
     <div class="ai-row" style="flex-direction:column;align-items:flex-start;gap:6px">
       ${newHist.length?`<label class="chk"><input type="checkbox" id="rptHist" checked> 把 data 分頁 ${newHist.length} 天的樣品存進系統（${newHist.map(h=>md(h.date)).join('、')}），讓本月累計平均值正確</label>`:''}
+      ${oldHist.length?`<label class="chk"><input type="checkbox" id="rptOver"> 以檔案內容覆蓋系統已有的 ${oldHist.length} 天（${oldHist.map(h=>md(h.date)).join('、')}），用於修正錯誤資料</label>`:''}
       ${fstd&&fstd.date?`<label class="chk"><input type="checkbox" id="rptStd" ${stdNewer?'checked':''}> 一併把標準表更新為檔案內的 ${rocDot(fstd.date)} 版</label>`:''}
     </div>
     <div class="ai-row"><button class="primary" id="rptApply">匯入並載入 ${md(d.date)} 日報</button><button id="rptCancel">取消</button></div>`;
@@ -1139,16 +1208,18 @@ async function applyReport(){
   if(!rpt)return;const btn=$('#rptApply');btn.disabled=true;
   try{
     if($('#rptStd')?.checked){btn.textContent='更新標準表…';if(!await saveStdInfo({date:rpt.fstd.date,name:rpt.name,rows:rpt.fstd.rows}))return}
-    if($('#rptHist')?.checked){
-      const list=rpt.hist.filter(h=>!days[h.date]);let i=0;
+    const addNew=$('#rptHist')?.checked,over=$('#rptOver')?.checked;
+    const list=rpt.hist.filter(h=>days[h.date]?over:addNew);
+    if(list.length){let i=0;
       for(const h of list){
         btn.textContent=`儲存歷史資料 ${++i}/${list.length}…`;
         h.updated=new Date().toISOString();h.source=`由 ${rpt.name} 的 data 分頁匯入`;
         const keep=cur;cur=h;const t=tableRows(h),idx=dayIndex(h);cur=keep;
         if(BACKEND)await gs('saveDay',h.date,JSON.stringify(h),t.header,t.rows,idx);
-        days[h.date]=JSON.parse(JSON.stringify(h));
+        days[h.date]=JSON.parse(JSON.stringify(h));clearDraft(h.date);
       }
-      if(!BACKEND)try{localStorage.setItem(LS+':all',JSON.stringify(days))}catch(e){}
+      if(BACKEND){btn.textContent='更新 data 分頁…';for(const ym of new Set(list.map(h=>h.date.slice(0,7))))await gs('saveData',dataPayload(ym,days))}
+      else try{localStorage.setItem(LS+':all',JSON.stringify(days))}catch(e){}
     }
     const d=rpt.day;d.source=`由 ${rpt.name} 匯入`;
     curDate=d.date;$('#date').value=d.date;cur=d;dirty=true;saveDraft();renderAll();renderDates();

@@ -4,6 +4,7 @@
  * 試算表裡會有三個工作表：
  *   日報資料：每天一列（日期、更新時間、品質指數、JSON），網頁讀寫用，請勿手動修改 JSON 欄
  *   明細：每天每個品項一列，方便在試算表裡查詢、篩選、做圖
+ *   data 115.11 …：每月一個，與 Excel 日報的 data 分頁相同，儲存或刪除日報時自動重建（平均值、標準差為公式）
  *   使用說明：欄位說明
  *
  * 選用：AI 照片辨識需要在「專案設定 → 指令碼屬性」新增 GEMINI_API_KEY
@@ -90,7 +91,7 @@ function listDays() {
 }
 
 /** 網頁儲存：覆寫該日資料與明細 */
-function saveDay(date, json, header, rows, idx) {
+function saveDay(date, json, header, rows, idx, data) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('日期格式錯誤');
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -127,10 +128,72 @@ function saveDay(date, json, header, rows, idx) {
       const n = rs.getLastRow() - 1;
       rs.getRange(2, 1, n, width).sort({ column: 1, ascending: true });
     }
+    if (data) writeData_(data);
     return 'ok';
   } finally {
     lock.releaseLock();
   }
+}
+
+/** 刪除某天日報：日報資料、明細都移除，並重建該月 data 分頁 */
+function deleteDay(date, data) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('日期格式錯誤');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    let n = 0;
+    for (const sh of [daysSheet_(), rowsSheet_()]) {
+      const last = sh.getLastRow();
+      if (last < 2) continue;
+      const col = sh.getRange(2, 1, last - 1, 1).getDisplayValues();
+      for (let r = col.length - 1; r >= 0; r--) {
+        if (col[r][0] === date) { sh.deleteRow(r + 2); n++; }
+      }
+    }
+    if (data) writeData_(data);
+    return n;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** 只重建某月 data 分頁（匯入多天後用） */
+function saveData(data) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    writeData_(data);
+    return 'ok';
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * data 分頁（每月一個，例「data 115.11」）：與 Excel 日報的 data 分頁相同欄位，
+ * 每個品項列出本月樣品，下方「累計平均值 / 標準差」是公式，試算表會自動計算。
+ * data = JSON 字串 {name, grid:[[...]], bold:[列], title:[列], stat:[列], red:['H12',...]}
+ */
+function writeData_(data) {
+  const o = typeof data === 'string' ? JSON.parse(data) : data;
+  if (!o || !/^data \d{3}\.\d{2}$/.test(o.name) || !Array.isArray(o.grid) || !o.grid.length) return;
+  const ss = ss_();
+  let sh = ss.getSheetByName(o.name);
+  if (!sh) sh = ss.insertSheet(o.name);
+  sh.clear();
+  const h = o.grid.length, w = o.grid[0].length;
+  if (sh.getMaxColumns() < w) sh.insertColumnsAfter(sh.getMaxColumns(), w - sh.getMaxColumns());
+  sh.getRange(1, 1, h, 6).setNumberFormat('@');   // 日期、製造日期、品管編號、項目保持文字
+  sh.getRange(1, 1, h, w).setValues(o.grid);
+  const rl = (rows, a, b) => sh.getRangeList(rows.map(r => a + r + ':' + b + r));
+  if (o.title && o.title.length) rl(o.title, 'A', 'T').setBackground('#e6f0e9');
+  if (o.bold && o.bold.length) rl(o.bold, 'A', 'T').setFontWeight('bold');
+  if (o.stat && o.stat.length) rl(o.stat, 'G', 'T').setNumberFormat('0.00').setFontColor('#1f5f8b');
+  if (o.red && o.red.length) sh.getRangeList(o.red).setFontColor('#c00000').setFontWeight('bold');
+  sh.getRange(1, 1).setFontSize(13);
+  sh.setColumnWidth(1, 90);
+  sh.setColumnWidth(2, 110);
+  sh.setFrozenRows(2);
 }
 
 /** 飼料成份製程管制標準表：每次上傳新增一列（保留歷史），網頁讀最後一列 */
@@ -188,7 +251,7 @@ function doPost(e) {
   let out;
   try {
     const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const fns = { listDays: listDays, saveDay: saveDay, getStd: getStd, saveStd: saveStd, aiEnabled: aiEnabled, aiExtract: aiExtract };
+    const fns = { listDays: listDays, saveDay: saveDay, deleteDay: deleteDay, saveData: saveData, getStd: getStd, saveStd: saveStd, aiEnabled: aiEnabled, aiExtract: aiExtract };
     if (!fns[req.fn]) throw new Error('不支援的功能：' + req.fn);
     out = { ok: true, data: fns[req.fn].apply(null, req.args || []) };
   } catch (err) {
