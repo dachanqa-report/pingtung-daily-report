@@ -133,12 +133,62 @@ function saveDay(date, json, header, rows, idx) {
   }
 }
 
+/** 飼料成份製程管制標準表：每次上傳新增一列（保留歷史），網頁讀最後一列 */
+const SHEET_STD = '標準表版本';
+const SHEET_STD_TABLE = '目前標準表';
+function stdSheet_() {
+  const ss = ss_();
+  let sh = ss.getSheetByName(SHEET_STD);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_STD);
+    sh.getRange(1, 1, 1, 5).setValues([['標準表日期', '上傳時間', '檔名', '品項數', 'JSON']]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    sh.getRange('A:A').setNumberFormat('@');
+    sh.setColumnWidth(5, 300);
+  }
+  return sh;
+}
+
+function getStd() {
+  const sh = stdSheet_();
+  const last = sh.getLastRow();
+  if (last < 2) return null;
+  return String(sh.getRange(last, 5).getValue()) || null;
+}
+
+/** json = {date:'2026-11-03', name:'檔名', rows:[{A:'料名',B:'代號',C:..,...,X:..}]} */
+function saveStd(json) {
+  const o = JSON.parse(json);
+  if (!o || !/^\d{4}-\d{2}-\d{2}$/.test(o.date) || !Array.isArray(o.rows) || !o.rows.length) throw new Error('標準表資料不完整');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const n = o.rows.filter(r => r.B != null && typeof r.C === 'number').length;
+    stdSheet_().appendRow([o.date, new Date(), o.name || '', n, json]);
+    // 可讀版本：目前使用中的標準表
+    const ss = ss_();
+    let t = ss.getSheetByName(SHEET_STD_TABLE);
+    if (!t) t = ss.insertSheet(SHEET_STD_TABLE);
+    t.clear();
+    const cols = 'ABCDEFGHIJKLMNOPQRSTUVWX'.split('');
+    const head = ['料名', '代號', 'CP下限', '', 'CP', 'CP上限', 'F下限', '', 'F', 'F上限', '纖維', 'P下限', '', 'P', 'P上限', 'Ca下限', '', 'Ca', 'Ca上限', 'M下限', '', 'M', 'M上限', '備註'];
+    const body = o.rows.map(r => cols.map(c => (r[c] == null ? '' : r[c])));
+    t.getRange(1, 1).setValue('飼料成份製程管制標準表　日期：' + o.date + '　（網頁上傳，' + (o.name || '') + '）').setFontWeight('bold');
+    t.getRange(2, 1, 1, cols.length).setValues([head]).setFontWeight('bold');
+    t.getRange('B:B').setNumberFormat('@');
+    t.getRange(3, 1, body.length, cols.length).setValues(body);
+    return 'ok';
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /** 外部網頁（GitHub Pages）呼叫用的資料 API：POST {fn, args} → {ok, data | error} */
 function doPost(e) {
   let out;
   try {
     const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const fns = { listDays: listDays, saveDay: saveDay, aiEnabled: aiEnabled, aiExtract: aiExtract };
+    const fns = { listDays: listDays, saveDay: saveDay, getStd: getStd, saveStd: saveStd, aiEnabled: aiEnabled, aiExtract: aiExtract };
     if (!fns[req.fn]) throw new Error('不支援的功能：' + req.fn);
     out = { ok: true, data: fns[req.fn].apply(null, req.args || []) };
   } catch (err) {
